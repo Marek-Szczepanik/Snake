@@ -30,11 +30,17 @@ local speedIncreaseAmount = 0.02 -- Amount to decrease SNAKE_MOVE_DELAY by
 
 function love.load()
     -- Set up the game window
-    love.window.setMode(1280, 720)
+    love.window.setMode(1280, 768)
     love.window.setTitle("Snake Game")
 
     -- Set the default graphics filter
     love.graphics.setDefaultFilter('nearest', 'nearest')
+
+    -- Load custom sprites
+    background = love.graphics.newImage("sprites/background.png")
+    foodImage = love.graphics.newImage("sprites/apple.png")
+    snakeHead = love.graphics.newImage("sprites/snakeHead.png")
+    snakeBody = love.graphics.newImage("sprites/snakeBody.png")
 
     -- Load retro-looking fonts
     hugeRetroFont = love.graphics.newFont('font.ttf', 100)
@@ -44,8 +50,21 @@ function love.load()
     -- Set the active font to the bigRetroFont
     love.graphics.setFont(bigRetroFont)
 
+    -- Load sound files
+    backgroundMusic = love.audio.newSource("sounds/Music_Loop.wav", "stream")
+    foodEatSound = love.audio.newSource("sounds/Action_Eat_03.wav", "static")
+    recordSounds = love.audio.newSource("sounds/Jingle_Bonus.wav", "static")
+
+    -- Set volume levels
+    backgroundMusic:setVolume(0.25) -- Adjust the volume as needed
+    foodEatSound:setVolume(1.0) -- Adjust the volume as needed
+
+    -- Start playing background music
+    backgroundMusic:setLooping(true)
+    backgroundMusic:play()
+
     -- Set up game variables
-    tileSize = 40
+    tileSize = 1280/20
     snake = {
         {x = 3, y = 3},
         {x = 2, y = 3},
@@ -54,6 +73,8 @@ function love.load()
     food = {x = 10, y = 10}
     direction = "right"
     timer = SNAKE_MOVE_DELAY
+
+    
 
     -- Reset the score and load the high score from storage
     score = 0
@@ -88,7 +109,8 @@ function love.update(dt)
 end
 
 function love.draw()
-    love.graphics.setColor(1, 1, 1) -- Set default color
+        -- Draw the background image
+        love.graphics.draw(background, 0, 0)
 
     if gameState == GAME_STATE.PLAY then
         -- Draw game elements...
@@ -99,28 +121,34 @@ function love.draw()
     elseif gameState == GAME_STATE.START then
         -- Draw the "Press any key to start" message with blinking
         love.graphics.setFont(hugeRetroFont)
-        love.graphics.setColor(0.2, 0.6, 0.2)
+        love.graphics.setColor(1, 1, 1)
         love.graphics.printf('SNAKE GAME', 0, 100, love.graphics.getWidth(), 'center')
 
-        love.graphics.setFont(bigRetroFont)
+        love.graphics.setFont(smallRetroFont)
+        if blinkVisible then
+            love.graphics.setColor(0, 0, 0)
+            love.graphics.printf('Press any key to start', 0, 300, love.graphics.getWidth(), 'center')
+        end
         love.graphics.setColor(1, 1, 1) -- Set default color
-        love.graphics.printf('Press any key to start', 0, 300, love.graphics.getWidth(), 'center')
+        
         
     elseif gameState == GAME_STATE.GAME_OVER then
         -- Draw the appropriate game over messages with blinking
         love.graphics.setFont(bigRetroFont)
         drawGameOverMessage()
-        drawTime()
     end
 end
 
 function love.keypressed(key)
     if gameState == GAME_STATE.START then
+        -- Reset timeElapsed when the game starts
+        timeElapsed = 0
         gameState = GAME_STATE.PLAY
     elseif gameState == GAME_STATE.PLAY then
         -- Handle player input during gameplay
         handlePlayerInput(key)
     elseif gameState == GAME_STATE.GAME_OVER then
+        backgroundMusic:stop()
         -- Update the high score and save it to storage
         if score > highScore then
             highScore = score
@@ -151,27 +179,69 @@ function moveSnake()
     if headX == food.x and headY == food.y then
         score = score + 1 -- Increase the score
         spawnFood()
+
+        -- Play the food eat sound
+        foodEatSound:play()
     else
         table.remove(snake)
     end
 end
 
 function drawSnake()
-    love.graphics.setColor(0.2, 0.6, 0.2)
-    for _, segment in ipairs(snake) do
-        love.graphics.rectangle("fill", (segment.x - 1) * tileSize, (segment.y - 1) * tileSize, tileSize, tileSize)
+    -- Draw the snake's head
+    local headSegment = snake[1]
+    local headX = (headSegment.x - 1) * tileSize
+    local headY = (headSegment.y - 1) * tileSize
+
+    love.graphics.setColor(1, 1, 1)
+
+    -- Determine the rotation angle based on the snake's movement direction
+    local rotation = 0
+    if direction == "up" then
+        rotation = math.rad(270) -- Rotate by 270 degrees (counterclockwise)
+    elseif direction == "down" then
+        rotation = math.rad(90) -- Rotate by 90 degrees (counterclockwise)
+    elseif direction == "left" then
+        rotation = math.rad(180) -- Rotate by 180 degrees (counterclockwise)
+    elseif direction == "right" then
+        rotation = 0
+    end
+
+    -- Adjust rotation based on the sprite's default orientation
+    rotation = rotation + math.rad(90)
+
+    -- Draw the snake's head with rotation and scaling using snakeHead image
+    local centerX = headX + tileSize / 2
+    local centerY = headY + tileSize / 2
+    local scale = 2 -- Scale the head to twice its size
+    love.graphics.draw(snakeHead, centerX, centerY, rotation, scale, scale, snakeHead:getWidth() / 2, snakeHead:getHeight() / 2)
+
+    -- Draw the rest of the body using snakeBody sprite
+    for i = 2, #snake do
+        local segment = snake[i]
+        local segmentX = (segment.x - 1) * tileSize
+        local segmentY = (segment.y - 1) * tileSize
+        
+        -- Scale the body segments and adjust position for centering
+        local bodyScale = 1
+        local offsetX = (tileSize - snakeBody:getWidth() * bodyScale) / 2
+        local offsetY = (tileSize - snakeBody:getHeight() * bodyScale) / 2
+        
+        love.graphics.draw(snakeBody, segmentX + offsetX, segmentY + offsetY, 0, bodyScale)
     end
 end
 
 function drawFood()
-    love.graphics.setColor(0.8, 0.1, 0.1)
-    love.graphics.rectangle("fill", (food.x - 1) * tileSize, (food.y - 1) * tileSize, tileSize, tileSize)
+    love.graphics.setColor(1, 1, 1)
+    local scale = tileSize / foodImage:getWidth() -- Calculate the scale based on tileSize
+    love.graphics.draw(foodImage, (food.x - 1) * tileSize, (food.y - 1) * tileSize, 0, scale, scale)
 end
 
 function drawScore()
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(smallRetroFont)
     love.graphics.print('Score: ' .. score, love.graphics.getWidth() - 180, 20)
+
 end
 
 function handlePlayerInput(key)
@@ -191,14 +261,19 @@ function drawGameOverMessage()
         love.graphics.printf('Score: ' .. score, 0, 300, love.graphics.getWidth(), 'center')
         love.graphics.setFont(smallRetroFont)
         if blinkVisible then
+            recordSound:play()
+            love.graphics.setColor(0, 0, 0)
             love.graphics.printf('Congratulations! You made a new record', 0, 150, love.graphics.getWidth(), 'center')
         end
     else
+        love.graphics.setColor(1, 1, 1)
         love.graphics.printf('Score: ' .. score .. '\nHigh Score: ' .. highScore, 0, 300, love.graphics.getWidth(), 'center')
         love.graphics.setFont(smallRetroFont)
         if blinkVisible then
+            love.graphics.setColor(0, 0, 0)
             love.graphics.printf('Game Over! Press any key to restart', 0, 150, love.graphics.getWidth(), 'center')
         end
+        love.graphics.setColor(1, 1, 1) -- restart colors
     end
 end
 
@@ -212,8 +287,9 @@ function checkCollision()
     local headX = snake[1].x
     local headY = snake[1].y
 
-    if headX <= 0 or headX > love.graphics.getWidth() / tileSize or
-       headY <= 0 or headY > love.graphics.getHeight() / tileSize then
+    -- Check collision with walls (2 rows from each side)
+    if headX <= 1 or headX > love.graphics.getWidth() / tileSize - 1 or
+       headY <= 1 or headY > love.graphics.getHeight() / tileSize - 1 then
         gameState = GAME_STATE.GAME_OVER -- Game Over
     end
 
@@ -224,11 +300,16 @@ function checkCollision()
     end
 end
 
+
 function spawnFood()
     -- Generate random food position
-    food.x = math.random(1, love.graphics.getWidth() / tileSize)
-    food.y = math.random(1, love.graphics.getHeight() / tileSize)
+    local maxX = love.graphics.getWidth() / tileSize - 1
+    local maxY = love.graphics.getHeight() / tileSize - 1
+    
+    food.x = math.random(2, maxX)
+    food.y = math.random(2, maxY)
 end
+
 
 function drawTime()
     love.graphics.setFont(smallRetroFont)
