@@ -1,11 +1,32 @@
 -- Snake game in Lua using LÖVE framework
 
-local gameState = 1 -- 1: Start of game, 2: Game logic, 3: Game over
+-- Constants
+local GAME_STATE = {
+    START = 1,
+    PLAY = 2,
+    GAME_OVER = 3
+}
+
+local BLINK_INTERVAL = 0.8
+local SNAKE_MOVE_DELAY = 0.1
+
+-- Game variables
+-- Score
+local gameState = GAME_STATE.START
 local score = 0
 local highScore = 0
 
-local blinkTimer = 0.8 -- Adjust this value for a slower blinking interval
+-- Blinking effect
+local blinkTimer = BLINK_INTERVAL
 local blinkVisible = true
+
+-- Snake
+local SNAKE_MOVE_DELAY = 0.1 -- Initial move delay
+local timeElapsed = 0
+local timeToIncreaseSpeed = 10 -- Increase speed every 10 seconds
+local speedIncreaseAmount = 0.02 -- Amount to decrease SNAKE_MOVE_DELAY by
+
+-- ...
 
 function love.load()
     -- Set up the game window
@@ -16,6 +37,7 @@ function love.load()
     love.graphics.setDefaultFilter('nearest', 'nearest')
 
     -- Load retro-looking fonts
+    hugeRetroFont = love.graphics.newFont('font.ttf', 100)
     bigRetroFont = love.graphics.newFont('font.ttf', 72)
     smallRetroFont = love.graphics.newFont('font.ttf', 36)
 
@@ -31,7 +53,7 @@ function love.load()
     }
     food = {x = 10, y = 10}
     direction = "right"
-    timer = 0.1
+    timer = SNAKE_MOVE_DELAY
 
     -- Reset the score and load the high score from storage
     score = 0
@@ -40,88 +62,72 @@ function love.load()
 end
 
 function love.update(dt)
-    if gameState == 2 then
+    if gameState == GAME_STATE.PLAY then
         -- Update game logic
         timer = timer - dt
+        timeElapsed = timeElapsed + dt
+
+        if timeElapsed >= timeToIncreaseSpeed then
+            timeToIncreaseSpeed = timeToIncreaseSpeed + 10 -- Increase the time to trigger next speed increase
+            SNAKE_MOVE_DELAY = SNAKE_MOVE_DELAY - speedIncreaseAmount -- Decrease the move delay
+        end
 
         if timer <= 0 then
             moveSnake()
             checkCollision()
-            timer = 0.1
+            timer = SNAKE_MOVE_DELAY
         end
-    elseif gameState == 1 or gameState == 3 then
+    elseif gameState == GAME_STATE.START or gameState == GAME_STATE.GAME_OVER then
         -- Implement the blinking effect for messages
         blinkTimer = blinkTimer - dt
         if blinkTimer <= 0 then
             blinkVisible = not blinkVisible -- Toggle visibility
-            blinkTimer = 0.8 -- Set the slower blinking interval
+            blinkTimer = BLINK_INTERVAL -- Set the slower blinking interval
         end
     end
 end
 
 function love.draw()
-    if gameState == 2 then
-        -- Draw the game elements
-        love.graphics.setColor(0.2, 0.6, 0.2)
-        for _, segment in ipairs(snake) do
-            love.graphics.rectangle("fill", (segment.x - 1) * tileSize, (segment.y - 1) * tileSize, tileSize, tileSize)
-        end
-        love.graphics.setColor(0.8, 0.1, 0.1)
-        love.graphics.rectangle("fill", (food.x - 1) * tileSize, (food.y - 1) * tileSize, tileSize, tileSize)
-        -- Display the score during gameplay (gameState 2)
-        love.graphics.setColor(1, 1, 1)
-        love.graphics.setFont(smallRetroFont)
-        love.graphics.print('Score: ' .. score, love.graphics.getWidth() - 160, 20)
+    love.graphics.setColor(1, 1, 1) -- Set default color
 
-    elseif gameState == 1 then
+    if gameState == GAME_STATE.PLAY then
+        -- Draw game elements...
+        drawSnake()
+        drawFood()
+        drawScore()
+        drawTime()
+    elseif gameState == GAME_STATE.START then
         -- Draw the "Press any key to start" message with blinking
-        love.graphics.setColor(1, 1, 1)
+        love.graphics.setFont(hugeRetroFont)
+        love.graphics.setColor(0.2, 0.6, 0.2)
+        love.graphics.printf('SNAKE GAME', 0, 100, love.graphics.getWidth(), 'center')
+
         love.graphics.setFont(bigRetroFont)
+        love.graphics.setColor(1, 1, 1) -- Set default color
         love.graphics.printf('Press any key to start', 0, 300, love.graphics.getWidth(), 'center')
         
-    elseif gameState == 3 then
+    elseif gameState == GAME_STATE.GAME_OVER then
         -- Draw the appropriate game over messages with blinking
-        love.graphics.setColor(1, 1, 1)
         love.graphics.setFont(bigRetroFont)
-        if score > highScore then
-            love.graphics.printf('Score: ' .. score, 0, 300, love.graphics.getWidth(), 'center')
-            love.graphics.setFont(smallRetroFont)
-            if blinkVisible then
-            love.graphics.printf('Congratulations! You made a new record', 0, 150, love.graphics.getWidth(), 'center')
-            end
-        else
-            love.graphics.printf('Score: ' .. score .. '\nHigh Score: ' .. highScore, 0, 300, love.graphics.getWidth(), 'center')
-            love.graphics.setFont(smallRetroFont)
-            if blinkVisible then
-            love.graphics.printf('Game Over! Press any key to restart', 0, 150, love.graphics.getWidth(), 'center')
-            end
-        end
+        drawGameOverMessage()
+        drawTime()
     end
 end
 
 function love.keypressed(key)
-    if gameState == 1 then
-        gameState = 2
-    elseif gameState == 2 then
+    if gameState == GAME_STATE.START then
+        gameState = GAME_STATE.PLAY
+    elseif gameState == GAME_STATE.PLAY then
         -- Handle player input during gameplay
-        if key == "up" and direction ~= "down" then
-            direction = "up"
-        elseif key == "down" and direction ~= "up" then
-            direction = "down"
-        elseif key == "left" and direction ~= "right" then
-            direction = "left"
-        elseif key == "right" and direction ~= "left" then
-            direction = "right"
-        end
-    elseif gameState == 3 then
+        handlePlayerInput(key)
+    elseif gameState == GAME_STATE.GAME_OVER then
         -- Update the high score and save it to storage
         if score > highScore then
             highScore = score
             love.filesystem.write("highscore.txt", tostring(highScore))
         end
         -- Reset game state for restart
-        love.load()
-        gameState = 1
+        resetGame()
     end
 end
 
@@ -150,6 +156,57 @@ function moveSnake()
     end
 end
 
+function drawSnake()
+    love.graphics.setColor(0.2, 0.6, 0.2)
+    for _, segment in ipairs(snake) do
+        love.graphics.rectangle("fill", (segment.x - 1) * tileSize, (segment.y - 1) * tileSize, tileSize, tileSize)
+    end
+end
+
+function drawFood()
+    love.graphics.setColor(0.8, 0.1, 0.1)
+    love.graphics.rectangle("fill", (food.x - 1) * tileSize, (food.y - 1) * tileSize, tileSize, tileSize)
+end
+
+function drawScore()
+    love.graphics.setColor(1, 1, 1)
+    love.graphics.setFont(smallRetroFont)
+    love.graphics.print('Score: ' .. score, love.graphics.getWidth() - 180, 20)
+end
+
+function handlePlayerInput(key)
+    if key == "up" and direction ~= "down" then
+        direction = "up"
+    elseif key == "down" and direction ~= "up" then
+        direction = "down"
+    elseif key == "left" and direction ~= "right" then
+        direction = "left"
+    elseif key == "right" and direction ~= "left" then
+        direction = "right"
+    end
+end
+
+function drawGameOverMessage()
+    if score > highScore then
+        love.graphics.printf('Score: ' .. score, 0, 300, love.graphics.getWidth(), 'center')
+        love.graphics.setFont(smallRetroFont)
+        if blinkVisible then
+            love.graphics.printf('Congratulations! You made a new record', 0, 150, love.graphics.getWidth(), 'center')
+        end
+    else
+        love.graphics.printf('Score: ' .. score .. '\nHigh Score: ' .. highScore, 0, 300, love.graphics.getWidth(), 'center')
+        love.graphics.setFont(smallRetroFont)
+        if blinkVisible then
+            love.graphics.printf('Game Over! Press any key to restart', 0, 150, love.graphics.getWidth(), 'center')
+        end
+    end
+end
+
+function resetGame()
+    love.load()
+    gameState = GAME_STATE.START
+end
+
 function checkCollision()
     -- Check collision with walls and snake's body
     local headX = snake[1].x
@@ -157,12 +214,12 @@ function checkCollision()
 
     if headX <= 0 or headX > love.graphics.getWidth() / tileSize or
        headY <= 0 or headY > love.graphics.getHeight() / tileSize then
-        gameState = 3 -- Game Over
+        gameState = GAME_STATE.GAME_OVER -- Game Over
     end
 
     for i = 2, #snake do
         if headX == snake[i].x and headY == snake[i].y then
-            gameState = 3 -- Game Over
+            gameState = GAME_STATE.GAME_OVER -- Game Over
         end
     end
 end
@@ -171,4 +228,10 @@ function spawnFood()
     -- Generate random food position
     food.x = math.random(1, love.graphics.getWidth() / tileSize)
     food.y = math.random(1, love.graphics.getHeight() / tileSize)
+end
+
+function drawTime()
+    love.graphics.setFont(smallRetroFont)
+    local formattedTime = string.format("Time: %.2f", timeElapsed)
+    love.graphics.print(formattedTime, 20, 20)
 end
