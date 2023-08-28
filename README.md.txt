@@ -1,6 +1,6 @@
 # Snake Game in Lua using LÖVE Framework
 
-#### Video Demo: [URL HERE](your_video_url)
+#### Video Demo: https://youtu.be/neNDCdkLVrg
 
 #### Description:
 This project is a simple Snake game implemented in Lua using the LÖVE framework. The game features a classic Snake gameplay, where the player controls a snake that grows in length as it consumes food items. The objective is to eat as much food as possible without colliding with the walls or the snake's own body.
@@ -26,4 +26,4 @@ This project is a simple Snake game implemented in Lua using the LÖVE framework
 
 Feel free to clone and modify this project to create your own version of the Snake game or experiment with the LÖVE framework.
 
-For a visual demonstration of the project, you can watch the video demo [here](your_video_url).
+For a visual demonstration of the project, you can watch the video demo https://youtu.be/neNDCdkLVrg
