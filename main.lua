@@ -57,8 +57,8 @@ function love.load()
     gameOverSound = love.audio.newSource("sounds/Jingle_Game_Over_02.wav", "static")
 
     -- Set volume levels
-    backgroundMusic:setVolume(0.25) -- Adjust the volume as needed
-    foodEatSound:setVolume(1.0) -- Adjust the volume as needed
+    backgroundMusic:setVolume(1) -- Adjust the volume as needed
+    foodEatSound:setVolume(2) -- Adjust the volume as needed
 
     -- Start playing background music
     backgroundMusic:setLooping(true)
@@ -150,15 +150,19 @@ function love.keypressed(key)
         handlePlayerInput(key)
     elseif gameState == GAME_STATE.GAME_OVER then
         backgroundMusic:stop()
-        -- Update the high score and save it to storage
-        if score > highScore then
-            highScore = score
-            love.filesystem.write("highscore.txt", tostring(highScore))
+        if key == "space" then
+            if score > highScore then
+                highScore = score
+                love.filesystem.write("highscore.txt", tostring(highScore))
+                resetGame() -- Reset the game if a new record is achieved
+            else
+                gameState = GAME_STATE.START -- Start a new game if space is pressed
+                resetGame()
+            end
         end
-        -- Reset game state for restart
-        resetGame()
     end
 end
+
 
 function moveSnake()
     -- Move the snake and handle collision with food
@@ -268,6 +272,7 @@ function drawGameOverMessage()
             love.graphics.printf('Congratulations! You made a new record', 0, 150, love.graphics.getWidth(), 'center')
         end
         love.graphics.setColor(1, 1, 1) -- restart colors
+        love.graphics.printf('Press SPACE to restart', 0, 600, love.graphics.getWidth(), 'center')
     else
         gameOverSound:play()
         love.graphics.setColor(1, 1, 1)
@@ -275,13 +280,14 @@ function drawGameOverMessage()
         love.graphics.setFont(smallRetroFont)
         if blinkVisible then
             love.graphics.setColor(0, 0, 0)
-            love.graphics.printf('Game Over! Press any key to restart', 0, 150, love.graphics.getWidth(), 'center')
+            love.graphics.printf('Game Over! Press SPACE to restart', 0, 150, love.graphics.getWidth(), 'center')
         end
         love.graphics.setColor(1, 1, 1) -- restart colors
     end
 end
 
 function resetGame()
+    SNAKE_MOVE_DELAY = 0.1 -- Reset the snake's initial move delay
     love.load()
     gameState = GAME_STATE.START
 end
@@ -306,13 +312,46 @@ end
 
 
 function spawnFood()
-    -- Generate random food position
     local maxX = love.graphics.getWidth() / tileSize - 1
     local maxY = love.graphics.getHeight() / tileSize - 1
-    
-    food.x = math.random(2, maxX)
-    food.y = math.random(2, maxY)
+
+    local availableTiles = {}
+
+    -- Create a list of tiles that the snake is not occupying
+    for x = 2, maxX do
+        for y = 2, maxY do
+            local isOccupied = false
+            for i = 1, #snake do
+                if x == snake[i].x and y == snake[i].y then
+                    isOccupied = true
+                    break
+                end
+            end
+            if not isOccupied then
+                table.insert(availableTiles, {x = x, y = y})
+            end
+        end
+    end
+
+    -- Remove tiles adjacent to the walls from the available tiles
+    local function isAdjacentToWall(tile)
+        return tile.x <= 2 or tile.x >= maxX or tile.y <= 2 or tile.y >= maxY
+    end
+
+    for i = #availableTiles, 1, -1 do
+        if isAdjacentToWall(availableTiles[i]) then
+            table.remove(availableTiles, i)
+        end
+    end
+
+    -- Choose a random tile from the remaining available tiles for food spawn
+    if #availableTiles > 0 then
+        local randomIndex = love.math.random(1, #availableTiles)
+        food.x = availableTiles[randomIndex].x
+        food.y = availableTiles[randomIndex].y
+    end
 end
+
 
 
 function drawTime()
