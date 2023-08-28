@@ -37,7 +37,7 @@ function love.load()
     love.graphics.setDefaultFilter('nearest', 'nearest')
 
     -- Load custom sprites
-    background = love.graphics.newImage("sprites/background.png")
+    background = love.graphics.newImage("sprites/backgroundGrey.png")
     foodImage = love.graphics.newImage("sprites/apple.png")
     snakeHead = love.graphics.newImage("sprites/snakeHead.png")
     snakeBody = love.graphics.newImage("sprites/snakeBody.png")
@@ -53,7 +53,8 @@ function love.load()
     -- Load sound files
     backgroundMusic = love.audio.newSource("sounds/Music_Loop.wav", "stream")
     foodEatSound = love.audio.newSource("sounds/Action_Eat_03.wav", "static")
-    recordSounds = love.audio.newSource("sounds/Jingle_Bonus.wav", "static")
+    recordSound = love.audio.newSource("sounds/Jingle_Bonus.wav", "static")
+    gameOverSound = love.audio.newSource("sounds/Jingle_Game_Over_02.wav", "static")
 
     -- Set volume levels
     backgroundMusic:setVolume(0.25) -- Adjust the volume as needed
@@ -257,15 +258,18 @@ function handlePlayerInput(key)
 end
 
 function drawGameOverMessage()
+    backgroundMusic:stop()
     if score > highScore then
+        recordSound:play()
         love.graphics.printf('Score: ' .. score, 0, 300, love.graphics.getWidth(), 'center')
         love.graphics.setFont(smallRetroFont)
         if blinkVisible then
-            recordSound:play()
             love.graphics.setColor(0, 0, 0)
             love.graphics.printf('Congratulations! You made a new record', 0, 150, love.graphics.getWidth(), 'center')
         end
+        love.graphics.setColor(1, 1, 1) -- restart colors
     else
+        gameOverSound:play()
         love.graphics.setColor(1, 1, 1)
         love.graphics.printf('Score: ' .. score .. '\nHigh Score: ' .. highScore, 0, 300, love.graphics.getWidth(), 'center')
         love.graphics.setFont(smallRetroFont)
